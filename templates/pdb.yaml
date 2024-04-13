@@ -1,0 +1,34 @@
+{{- $nautobots := (include "nautobot.nautobots" $) | mustFromJson -}}
+{{- $workers := (include "nautobot.workers" .) | mustFromJson -}}
+{{- $deploymentTypes := (list $nautobots $workers)}}
+{{- range $deployments := $deploymentTypes }}
+{{- range $deploymentName, $deployment := $deployments -}}
+{{- if $deployment.pdb.create }}
+---
+apiVersion: {{ include "common.capabilities.policy.apiVersion" $ }}
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "common.names.fullname" $ }}-{{ if eq $deployment.component "nautobot-celery"}}celery-{{ end }}{{ $deploymentName }}
+  namespace: {{ $.Release.Namespace | quote }}
+  labels: {{- include "common.labels.standard" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $deployment.component }}-{{ $deploymentName }}
+    {{- if $.Values.commonLabels }}
+    {{- include "common.tplvalues.render" ( dict "value" $.Values.commonLabels "context" $ ) | nindent 4 }}
+    {{- end }}
+  {{- if $.Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" ( dict "value" $.Values.commonAnnotations "context" $ ) | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $deployment.pdb.minAvailable }}
+  minAvailable: {{ $deployment.pdb.minAvailable }}
+  {{- end }}
+  {{- if $deployment.pdb.maxUnavailable }}
+  maxUnavailable: {{ $deployment.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: {{ $deployment.component }}-{{ $deploymentName }}
+      {{- include "common.labels.matchLabels" $ | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}
